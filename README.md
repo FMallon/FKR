@@ -6,7 +6,7 @@ A cross-distro compatible Package Manager handler - basically just detects Packa
 - Install using this command:
 
 ```
-cd /var/opt && sudo git clone https://github.com/FMallon/FKR && cd FKR && sudo chmod +x ./fkr.sh && sudo ln -s $(pwd)/fkr.sh /usr/local/bin/fkr"
+cd /var/opt && sudo git clone https://github.com/FMallon/FKR && cd FKR && sudo chmod +x ./fkr.sh && sudo ln -s $(pwd)/fkr.sh /usr/local/bin/fkr
 ```
 
 # Note
@@ -21,7 +21,7 @@ The reason I am making it now, is for another project I am working on, and I nee
 
 As stated above, this is in testing stage, I've only spent a few hours total on this.  I need to make public so I can download and begin hardening/testing/improving the code using other systems.  
 
-So far, it has only been tested in WSL - Arch.  I don't even know if the other Package Manager commands and flags work - hence why it is public... I refuse to upload privately and use git authentification on a load of systems.
+So far, it has only been tested in WSL - Arch (and it also seems to work on apt cuz I just tested it the second after uploading).  I don't even know if the other Package Manager commands and flags work - hence why it is public... I refuse to upload privately and use git authentification on a load of systems.
 
 So.... use at your own volition, I can't stop you, and I assume you are a grown adult. 
 
