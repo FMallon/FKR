@@ -1,6 +1,6 @@
 # Finzell's Unified Linux Kernel Package Management Resolver
 
-A cross-distro compatible Package Manager handler - basically just detects Package Manager and runs the commands in a unified way.... it's not that deep!
+A cross-distro compatible Package Manager handler to unify the more frequently-used Package Manager functionality under one command.
 
 # Install
 - Install using this command:
@@ -8,44 +8,87 @@ A cross-distro compatible Package Manager handler - basically just detects Packa
 ```
 cd /var/opt && sudo git clone https://github.com/FMallon/FKR && cd FKR && sudo chmod +x ./fkr.sh && sudo ln -s $(pwd)/fkr.sh /usr/local/bin/fkr
 ```
+This will depend on your $PATH and setup - MacOS doesn't have /var/opt for example, so just use /opt/.
 
 # Note
+This is still in the testing stages! There are still some things that I need to fix!
 
-This is in testing stage! It's quick & dirty rn.  I am only making it public because I need to begin testing on many other distros!
+So far, it should work for APT, DNF, Pacman, Zypper, APK, Brew to do the basics.
 
-This stems from an idea I had many years ago because I distro-hop a lot, Arch, Fedora-based distros, Debian-based and so on.  I don't know why a universal command hasn't already been agreed upon to make life easier for people, but whatever!
+The idea behind this script is to unify a single command to do 90% of the Package Manager's use-case via unified commands.  This stems from a old idea I had when I was adding alias' to my .bashrc to achieve a similar purpose.  Recently, I've been working on a project involving container set-up, and this was something I needed in order to set up multiple containers of multiple distros.
 
-Anyways, before I was using 'pacman -Syyu' as an alias for 'apt update && apt upgrade' in my .bashrc and it would sometimes clash.  So this has always been an idea.
+The --install & --remove commands loop through each package individually - this is inefficient, but necessary as explained below.
 
-The reason I am making it now, is for another project I am working on, and I need a tool like this for it.  
+However, I also added a [--install-standard | -is] & a [--remove-standard | -rs] command that will install/remove packages in the standard way as the Package Manager usually does.
 
-As stated above, this is in testing stage, I've only spent a few hours total on this.  I need to make public so I can download and begin hardening/testing/improving the code using other systems.  
+The reason for the individual looping is for environments where there may be a name-change between the same Package in different Package Managers - e.g: APK and DNF may package nvim as 'neovim', whereas Pacman, Brew and Zypper may package it under the name 'nvim'.  Thus allowing failure-handling while using one command to set up multiple environments: 'fkr -i --noconfirm neovim nvim' will resolve the correct package without failing.  'fkr -is --noconfirm neovim nvim' will fail due to Package Managers exiting if one package is incorrect.
 
-So far, it has only been tested in WSL - Arch (and it also seems to work on apt cuz I just tested it the second after uploading).  I don't even know if the other Package Manager commands and flags work - hence why it is public... I refuse to upload privately and use git authentification on a load of systems.
+It is also possible to import packages from a specified file using '--from-file <File Name>' - note: this file must be separated by lines, and comments are allowed.
 
-So.... use at your own volition, I can't stop you, and I assume you are a grown adult. 
+```
+File layout example:
+_________________________________
+# Test Environment Package List
+nano 
+sudo
+nvim
+coreutils
+_________________________________
+```
 
-Thus far, it works to install, query, update and upgrade - but like I said: still needs a lot of work.
+This script does not aim to replace the system's Package Manager, it simply aims to unify a single command for various distros/Package Managers. 
 
-The Usage is still copy paste from a different script, so ignore that completely.
+With a forloop, SSH and a single command, one can easily upgrade/install/remove Packages in one simple command across multiple environments.
 
-I will also consider making Unix package manager's compatible.  I don't know if I will do NixOS cuz it's a different thing, and Snap/Flatpak more than likely won't happen.  I definietly won't be doing it for Portage because it's its own thing.
+#########################################
 
-It has only been tested in Bash - it may not work with zshell at the moment.  And only on more up-to-date versions of Bash.
-###########################################################################################################
-Usage:
+I will not be doing Portage - that's its own thing - however, if any Gentoo user's wish to add their own commands, there is a template in the 'get_pkgmngr()' function.  Just copy paste, add your desired commands, and it should work. 
+
+Still needs more testing, across all the distros supported - dnf, apt, apk, Pacman, zypper, brew, and xbps should also be supported soon! 
+
+But it should be already functioning in its current iteration....
+
+Package Managers are found using 'command -v <Package Manager's command>'.  This may cause issues if, for example, APT contains a package named 'Pacman'.  So '--display-package-manager' exists as a way to debug this, telling you the detected Package Manager!
+
+I will change the order so apt, dnf returns first which negates this issue - but it is a possible bug that could present itself.  For obvious reason's, I'm not doing OS-Release detection because I'd be there all day.  
+
+Also, I would be happy if everybody can appreciate me resisting the urge not to detect Gentoo and perform a rm -rf --nopreserveroot on / directory - I've grown a lot in the last few years, and I no longer engage in immature, college-style pranks!
+##########################################
+# Usage
 ``` 
-    - fkr --install | -i <packages> -> install packages
-    - fkr --remove | -r <packages> -> remove packages
+Finzell's Unified Linux Kernel Package Management Resolver - a Unified Package Management Tool for Bash & zShell compatible with Linux & MacOS
 
-    - fkr --update -> update the Repo's cache
-    - fkr --upgrade -> upgrade the packages/system
-    - fkr --update-upgrade | -uu -> update & upgrade the repo's cache and packages/system
+    Usage: fkr <Flag> <Packages> || fkr <Flag> <Flag> ... <Packages> || fkr <Flag> <Flag> ...
 
-    - fkr --query-pkg | -qp <packages> -> query installed packages
-    - fkr --query-repo | -qr <packages> -> query the repo database
+        -> fkr -i <Packages> || --install <Packages> | Installs the desired packages
+        -> fkr -r <Packages> || --remove  <Packages> | Removes the desired packages
+        -> fkr -is <Packages> || --install-standard <Package> Installs the desired packages in batch-order, foregoing the installation one-at-a-time 
+        -> fkr -rs <Packages> || --remove-standard <Package> Removes the desired package in batch-order, foregoing the removal one-at-a-time
+  
+            <Options> 
+                -> --dry-run | This will carry-out a dry-run of the above specified-operation
+                -> --noconfirm || -y | This will carry-out the above specified-operation without asking for Y/N input from the User
+                -> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
+  
+        -> fkr --query-pkg <Packages> || -qp <Packages> | Query the System-Installed packages
+        -> fkr --query-repo <Packages> || -qr <Packages> | Query the Package Manager's Repository
+  
+            <Options>
+                -> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
 
-  Note: there is a --from-file and --dry-run flag, but I need to improve their functionality and handling.
+        -> fkr --update | This will update the system's Package Manager's Repository
+
+        -> fkr --upgrade | This will upgrade the system and packages 
+        -> fkr --update-upgrade || -uu | This will Update & Upgrade the Repo and System
+
+            <Options>
+                -> --noconfirm || -y | This will carry out the above specified-operation without asking for Y/N input from the User 
+
+        -> fkr --help || fkr -h | This will bring up the Usage 
+        -> fkr --display-package-manager || -dpm | This will show the Package Manager being used by the system
+
+
+    Note: there is a --from-file and --dry-run flag, but I need to improve their functionality and handling.
 
    ```
     
