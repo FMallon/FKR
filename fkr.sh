@@ -5,7 +5,19 @@
 #-A way to standardize and make managing packages across multple distros easier
 #-Will begin with Pacman, Apt, dnf, apk, brew & Zypper cuz I need them for Containers and my MacOS
 #-More can, and maybe will be, added in the future, like Unix Package Managers - I can't think of any more except for NixOS... but that's done through a Config file - will see in the future  
-#-I will not be doing this for Portage - that's it's own thing, and using Emerge makes more sense, especially as it pertains to necessary output regarding USE Flags and Masks etc. 
+#-I will not be doing this for Portage - that's it's own thing, and using Emerge makes more sense, especially as it pertains to necessary output regarding USE Flags and Masks etc.
+
+#### Returns ####
+# 
+#-Return 2: Unsupported Package Manager
+#-Return 3: Invalid Super User privileges
+#-Return 4: No Packages Specified
+#-Return 5: Error finding input file
+#-Return 6: Error writing to temporary log
+#-Return 7: Error cleaning temporary logs from memory
+#-Return 8: Invalid Flag
+
+
 
 if [ -n "$BASH_VERSION" ]; then
     MAIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )"
@@ -25,6 +37,8 @@ UPDATE=()
 UPGRADE=()
 
 DRYRUN_FLAG=()
+NO_CONFIRM_FLAG=()
+
 
 
 check_root(){
@@ -33,7 +47,7 @@ check_root(){
     local root=""
 
     #check for current privilege status
-    if [ "$EUID" -eq 0 ]; then 
+    if [[ "$EUID" -eq 0 ]]; then 
 
         ROOT=()
         return 0
@@ -44,115 +58,81 @@ check_root(){
     if command -v doas >/dev/null 2>&1; then
         
         root=(doas)
-        ROOT=($root)
+        ROOT=("${root[@]}")
 
     elif command -v sudo >/dev/null 2>&1; then
 
         root=(sudo)
-        ROOT=($root)
+        ROOT=("${root[@]}")
 
     else
 
-        printf "\n\nError: You need root privilege to run this!\n\n"
+        printf "\n\nError: You need root privilege to run this - Sudo nor Doas appear to be installed!\n\n"
         return 3
 
     fi 
-
-
-    # Test if user is Super User!
-    sudo -v >/dev/null 2>&1
-    if [[ "$?" -eq 0 ]]; then
-        
-        return 0
-
-    fi
-
     
-    doas true >/dev/null 2>&1
-    if [[ "$?" -eq 0 ]]; then
-        
-        return 0
-
-    fi
-
-
-    printf "\nError: You are not a Super User!\n"
-    clear_space
-    return 3
+    
+    return 0
 
 
 }
 
-
-
-clear_space(){
-
-
-    printf "\n\n"
-
-
-}
-
-
-
-print_line_separater(){
-
-
-    printf "\n__________________________________________________________________________________________\n"
-
-
-}
 
 
 
 get_pkgmgr(){
 
-    if command -v pacman >/dev/null 2>&1; then 
 
-        PKGMNGR=(pacman)
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -S --noconfirm)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -R --noconfirm)
-        QUERY_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -Q)
-        QUERY_REPO=("${ROOT[@]}" "${PKGMNGR[@]}" -Si)
-
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" -Sy)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" -Su)
-
-        DRYRUN_FLAG=(--print)
-
-        return 0
-
-    
-    elif command -v apt >/dev/null 2>&1; then 
+    if command -v apt-get >/dev/null 2>&1; then 
 
         PKGMNGR=(apt-get)
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install -y)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove -y)
-        QUERY_PKG=("${ROOT[@]}" dpkg -s)
-        QUERY_REPO=("${ROOT[@]}" apt-cache show)
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install)
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove)
+        QUERY_PKG=(dpkg -s)
+        QUERY_REPO=(apt-cache show)
 
         UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade -y)
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
 
+        NO_CONFIRM_FLAG=(-y)
         DRYRUN_FLAG=(-s)
         
         return 0
 
-    
+
     elif command -v dnf >/dev/null 2>&1; then 
 
         PKGMNGR=(dnf)
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install -y)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove -y)
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install)
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove)
         QUERY_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" list installed)
         QUERY_REPO=("${ROOT[@]}" "${PKGMNGR[@]}" info)
 
         UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" check-update)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade -y)
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
 
+        NO_CONFIRM_FLAG=(-y)
         DRYRUN_FLAG=(--assumeno)
 
         return 0
+
+    elif command -v pacman >/dev/null 2>&1; then 
+
+        PKGMNGR=(pacman)
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -S)
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -R)
+        QUERY_PKG=("${PKGMNGR[@]}" -Q)
+        QUERY_REPO=("${PKGMNGR[@]}" -Si)
+
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" -Sy)
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" -Syu)
+
+        NO_CONFIRM_FLAG=(--noconfirm)
+        DRYRUN_FLAG=(--print)
+
+        return 0
+
 
 
     elif command -v zypper >/dev/null 2>&1; then
@@ -165,8 +145,9 @@ get_pkgmgr(){
         QUERY_REPO=("${ROOT[@]}" "${PKGMNGR[@]}" info)
 
         UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" refresh)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" update -y)
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
 
+        NO_CONFIRM_FLAG=(-y)
         DRYRUN_FLAG=(--dry-run)
 
         return 0
@@ -179,14 +160,15 @@ get_pkgmgr(){
 
         PKGMNGR=(brew)
 
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" uninstall)
-        QUERY_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" list)
-        QUERY_REPO=("${ROOT[@]}" "${PKGMNGR[@]}" info)
+        INSTALL_PKG=("${PKGMNGR[@]}" install)
+        REMOVE_PKG=("${PKGMNGR[@]}" uninstall)
+        QUERY_PKG=("${PKGMNGR[@]}" list)
+        QUERY_REPO=("${PKGMNGR[@]}" info)
 
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
+        UPDATE=("${PKGMNGR[@]}" update)
+        UPGRADE=("${PKGMNGR[@]}" upgrade)
 
+        NO_CONFIRM_FLAG=()
         DRYRUN_FLAG=(--dry-run)
 
         return 0
@@ -204,11 +186,13 @@ get_pkgmgr(){
         UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
         UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
 
+        NO_CONFIRM_FLAG=()
         DRYRUN_FLAG=(--simulate)
 
         return 0
 
-    ###Template for adding another Package Manager### 
+    ###Template for adding another Package Manager###
+    #-Keep in mind that some package managers don't require root to run certain commands, so adjust as necessary
     #elif command -v #package-manager >/dev/null 2>&1; then 
 
         #PKGMNGR=(package-manager)
@@ -222,6 +206,8 @@ get_pkgmgr(){
         #UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" package-manager-upgrade_package-command)
 
         #DRYRUN_FLAG=(package-manager-dry-run_package-command)
+        #NO_CONFIRM_FLAG=(package-manager-no-confirm-package-command)
+ 
 
         #return 0
 
@@ -236,319 +222,511 @@ get_pkgmgr(){
 }
 
 
+display_package_manager(){
 
-check_builtins(){
+  get_pkgmgr
+
+  printf "\nYou are currently using %s\n\n" "${PKGMNGR[@]}"
 
 
-    local pkg="$1"
-    local check=1
+}
 
-    command -v type -a "$pkg" >/dev/null 2>&1
-    check="$?"
 
-    check_builtin "$pkg"
-    if [[ "$check" -eq 0 ]]; then
 
-        printf "'%s' exists on your system!" "$pkg"
+clear_space(){
 
-    else 
 
-        printf "'%s' doesn't exist on your system!" "$pkg"
+    printf "\n\n"
+
+
+}
+
+
+
+
+print_line_separator(){
+
+
+    printf "\n__________________________________________________________________________________________\n"
+
+
+}
+
+
+
+
+set_space(){
+
+    clear_space
+    print_line_separator
+    clear_space
+
+}
+
+
+
+
+cleanup(){
+
+   
+    
+    rm -f "$log_success" "$log_failure"
+
+
+}
+
+
+
+
+print_temp_file(){
+
+  #Forego Cat just in case it doesn't exist - like in a very minimal container;
+
+
+        for log_file in "$log_success" "$log_failure"; do
+
+            while IFS= read -r line; do
+
+              printf "%s\n" "$line"
+
+            done < "$log_file"
+
+        done
+
+
+}
+
+
+
+
+open_temp_file(){
+
+
+    log_success=$(mktemp) || return 6
+    log_failure=$(mktemp) || return 6
+
+
+}
+
+
+
+
+validate_environment(){
+
+
+    check_root || return "$?"
+    get_pkgmgr || return "$?"
+    
+    return 0    
+
+
+}
+
+
+
+
+read_pkg_from_file(){
+
+
+    local pkg=""
+    pkgs=()
+
+    if [[ ! -f "$user_defined_pkg_file" ]]; then 
+        printf "\nError: cannot find file '%s'!\n" "$user_defined_pkg_file"
+        return 5
+    fi
+
+    while IFS= read -r pkg; do
+
+        if [[ "$pkg" =~ ^# ]]; then
+            continue
+        fi
+        
+        if [[ -z "$pkg" ]]; then
+        
+            continue
+
+        fi
+
+        pkg="${pkg#"${pkg%%[![:space:]]*}"}"
+        pkg="${pkg%"${pkg##*[![:space:]]}"}"
+        pkgs+=("$pkg")
+
+
+    
+    done < "$user_defined_pkg_file"
+    
+
+    return 0
+
+
+}
+
+
+
+
+
+parse_flags_min(){
+
+
+
+    dry_run_check=0
+    no_confirm_check=0
+
+    while (($# > 0)); do 
+
+      case "$1" in 
+
+        --dry-run)
+          dry_run_check=1
+          shift
+      ;;
+
+      --noconfirm | -y)
+        no_confirm_check=1
+        shift
+
+      ;;
+
+      --)
+
+        shift 
+        break
+      
+      ;;
+
+      *)
+      
+        printf "\nError: this is an invalid flag!\n"
+        usage
+        return 8
+      ;;
+        
+      esac
+    
+    shift
+    done
+
+    return 0
+
+}
+
+
+
+
+
+ parse_flags_full(){
+
+
+    user_defined_pkg_file=""
+    dry_run_check=0
+    no_confirm_check=0
+    pkgs=()
+    pkg_overflow_check=0
+
+    while (($# > 0)); do
+    
+        case "$1" in 
+
+            --from-file)
+                if [[ -z "$2" || "$2" == -* ]]; then
+                    printf "\nError: '--from-file' requires a valid file path\n"
+                    return 8
+                fi
+
+                #Stops a combining of pkg input plus from file input
+                if [[ "${#pkgs[@]}" -gt 0 ]]; then
+                    printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
+
+                    return 8
+                fi
+
+                user_defined_pkg_file="$2"
+                shift 2
+                read_pkg_from_file || return "$?"
+
+                pkg_overflow_check=1
+
+            ;;
+
+            --dry-run)
+                #Do a dry run
+                dry_run_check=1
+                shift
+            ;;
+
+            --noconfirm | -y)
+                #Add no confirm flag
+                no_confirm_check=1
+                shift
+            ;;
+
+            --)
+                #End of flags
+                shift
+                break 
+            ;;
+
+            -*)
+                #Invalid flag - usage()
+                printf "\nError: This is an invalid flag\n\n"
+                usage
+                return 8 
+            ;;
+
+            *) 
+
+                if [[ "$pkg_overflow_check" -eq 1 ]]; then
+                    
+                    printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
+                    return 8
+
+                fi
+                
+                #packages
+                pkgs+=("$1")
+                shift
+            ;;
+
+        esac
+
+
+    done
+
+
+
+    return 0
+
+
+}
+
+
+
+
+verify_no_of_pkgs(){
+
+
+  
+    if [[ "${#pkgs[@]}" -eq 0 ]]; then
+
+      printf "Error: No Packages have been specified!"
+      return 4
 
     fi
 
-    return "$check"
+    return 0
+
 
 }
+
 
 
 
 query_pkg(){
 
-    check_root || return "$?"
-    get_pkgmgr || return "$?"
+   
 
-    local log_query_pkg_success=$(mktemp)
-    local log_query_pkg_failure=$(mktemp)
-    trap 'rm -f "$log_query_pkg_success" "$log_query_pkg_failure"' EXIT INT TERM
+    validate_environment || return "$?"
+    open_temp_file || return "$?"
+    parse_flags_full "$@" || return "$?"
 
-    local from_file=""
-    local dry_run=0
-    local pkgs=()
+    verify_no_of_pkgs || return "$?"
 
-    shift
-    while [ $# -gt 0 ]; do
-        
-        case "$1" in
-
-            --from-file)
-                from_file="$2"
-                shift 2
-            ;;
-
-            -*)
-                printf "Error: Invalid option: %s\n" "$1"
-                return 1
-            ;;
-
-            *)
-                pkgs+=("$1")
-                shift
-            ;;
-
-        esac
-
-    done
+    local query_pkg=("${QUERY_PKG[@]}")
 
 
-        
-    #Read packages from file if given
-    if [[ -n "$from_file" ]]; then
-        while IFS= read -r line; do
-            #Trim spaces
-            line="${line#"${line%%[![:space:]]*}"}"
-            line="${line%"${line##*[![:space:]]}"}"
+    
+    if [[ "$dry_run_check" -eq 1 ]]; then
+      
+      query_pkg+=("${DRYRUN_FLAG[@]}")
 
-            #Skip empty lines or comment lines
-            [[ -z "$line" || "$line" =~ ^# ]] && continue
-
-            #Split line into words and append to pkgs array
-            for pkg in $line; do
-                pkgs+=("$pkg")
-            done
-        done < "$from_file"
-    fi
-
-        
-    if [ ${#pkgs[@]} -eq 0 ]; then
-        
-        echo "No packages specified"
-        return 4
-        
     fi
 
 
+
+    if [[  "$no_confirm_check" -eq 1 ]]; then
+
+      query_pkg+=("${NO_CONFIRM_FLAG[@]}")
+
+    fi
 
 
 
     for pkg in "${pkgs[@]}"; do
 
-        "${QUERY_PKG[@]}" "$pkg" \
-            && printf "Package '%s' exists\n" "$pkg" >> "$log_query_pkg_success" \
-            || printf "Package '%s' not found\n" "$pkg" >> "$log_query_pkg_failure"
+      "${query_pkg[@]}" "$pkg"
+      local status="$?"
+
+      if [[ "$status" -eq 0 ]]; then
+          
+        printf "Package '%s' exists\n" "$pkg" >> "$log_success" \
+      
+      else
+        
+        printf "Package '%s' not found\n" "$pkg" >> "$log_failure"
+
+      fi
     
     done
 
 
+    set_space
+    print_temp_file
+    set_space
+    cleanup
 
-    clear_space
-    print_line_separater
-    clear_space
-    cat "$log_query_pkg_success" "$log_query_pkg_failure"
-    print_line_separater
-    clear_space
-    rm -f "$log_query_pkg_success" "$log_query_pkg_failure"
-
-
+    return 0
 
 }
+
 
 
 
 query_repo(){
 
-    check_root || return "$?"
-    get_pkgmgr || return "$?"
 
-    local log_query_repo_success=$(mktemp)
-    local log_query_repo_failure=$(mktemp)
-    trap 'rm -f "$log_query_repo_success" "$log_query_repo_failure"' EXIT INT TERM
 
-    local from_file=""
-    local dry_run=0
-    local pkgs=()
 
-    shift
-    while [[ $# -gt 0 ]]; do
+  validate_environment || return "$?"
+  open_temp_file || return "$?"
+  parse_flags_full "$@" || return "$?"
+
+  verify_no_of_pkgs || return "$?"
+
+  local query_repo=("${QUERY_REPO[@]}")
+
+
+  if [[ "$dry_run_check" -eq 1 ]]; then 
+  
+    query_repo+=("${DRYRUN_FLAG[@]}")
+
+  fi
+
+
+  if [[ "$no_confirm_check" -eq 1 ]]; then
+
+    query_repo+=("${NO_CONFIRM_FLAG[@]}")
+
+  fi
+
+
+  for pkg in "${pkgs[@]}"; do
+
+    "${query_repo[@]}" "$pkg"
+
+    local status="$?"
+    
+    if [[ "$status" -eq 0 ]]; then
         
-        case "$1" in
+      printf "Package '%s' exists in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_success" \
+      
+    else
+      
+      printf "Package '%s' not found in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_failure"
 
-            --from-file)
-                from_file="$2"
-                shift 2
-            ;;
-
-            -*)
-                printf "Error: Invalid option: %s\n" "$1"
-                return 1
-            ;;
-
-            *)
-                pkgs+=("$1")
-                shift
-            ;;
-
-        esac
-
-    done
-
-
-        
-    #Read packages from file if given
-    if [[ -n "$from_file" ]]; then
-        while IFS= read -r line; do
-            
-            #Trim spaces
-            line="${line#"${line%%[![:space:]]*}"}"
-            line="${line%"${line##*[![:space:]]}"}"
-
-            #Skip empty lines or comment lines
-            [[ -z "$line" || "$line" =~ ^# ]] && continue
-
-            #Split line into words and append to pkgs array
-            for pkg in $line; do
-                pkgs+=("$pkg")
-            done
-        done < "$from_file"
     fi
-
-        
-    if [ ${#pkgs[@]} -eq 0 ]; then
-        
-        printf "No packages specified"
-        return 4
-        
-    fi
+    
+  done
 
 
+    set_space
+    print_temp_file || return "$?"
+    set_space
+    cleanup || return "$?"
+    
+
+}
 
 
-
-    for pkg in "${pkgs[@]}"; do
-
-
-        "${QUERY_REPO[@]}" "$pkg" \
-            && printf "Package '%s' exists in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_query_repo_success" \
-            || printf "Package '%s' not found in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_query_repo_failure"
-
-        
-    done
+install_packages_standard(){
 
 
+  validate_environment || return "$?"
+  parse_flags_full "$@" || return "$?"
 
-    clear_space
-    print_line_separater
-    clear_space
-    cat "$log_query_repo_success" "$log_query_repo_failure"
-    print_line_separater
-    clear_space
-    rm -f "$log_query_repo_success" "$log_query_repo_failure"
+  verify_no_of_pkgs || return "$?"
+
+  local install_pkg=("${INSTALL_PKG[@]}")
+
+
+  
+  if [[ "$dry_run_check" -eq 1 ]]; then
+
+    install_pkg+=("${DRYRUN_FLAG[@]}")
+
+  fi 
+
+  
+  if [[ "$no_confirm_check" -eq 1 ]]; then
+
+    install_pkg+=("${NO_CONFIRM_FLAG[@]}")
+
+  fi
+
+  
+  "${install_pkg[@]}" "${pkgs[@]}"
 
 
 }
 
 
+
 install_packages(){
 
 
-    check_root || return "$?"
-    get_pkgmgr || return "$?"
 
-    local log_install_success=$(mktemp)
-    local log_install_failure=$(mktemp)
-    trap 'rm -f "$log_install_success" "$log_install_failure"' EXIT INT TERM
+    validate_environment || return "$?"
+    open_temp_file || return "$?"
+    parse_flags_full "$@" || return "$?"
 
-    local from_file=""
-    local dry_run=0
-    local pkgs=()
+    verify_no_of_pkgs || return "$?"
 
-    shift
-    while [ $# -gt 0 ]; do
-        
-        case "$1" in
+    local install_pkg=("${INSTALL_PKG[@]}")
+         
 
-            --from-file)
-                from_file="$2"
-                shift 2
-            ;;
+    
+    if [[ "$dry_run_check" -eq 1 ]]; then
 
-            --dry-run)
-                dry_run=1
-                shift
-            ;;
+        install_pkg+=("${DRYRUN_FLAG[@]}")
 
-            --) #end of flags
-                shift
-                break
-            ;;
-
-            -*)
-                printf "Error: Invalid option: %s\n" "$1"
-                return 1
-            ;;
-
-            *)
-                pkgs+=("$1")
-                shift
-                ;;
-
-        esac
-
-    done
-
-
-        
-    #Read packages from file if given
-    if [[ -n "$from_file" ]]; then
-        while IFS= read -r line; do
-            
-            #Trim spaces
-            line="${line#"${line%%[![:space:]]*}"}"
-            line="${line%"${line##*[![:space:]]}"}"
-
-            #Skip empty lines or comment lines
-            [[ -z "$line" || "$line" =~ ^# ]] && continue
-
-            #Split line into words and append to pkgs array
-            for pkg in $line; do
-                pkgs+=("$pkg")
-            done
-        done < "$from_file"
     fi
 
+
+    if [[ "$no_confirm_check" -eq 1 ]]; then
+
+         install_pkg+=("${NO_CONFIRM_FLAG[@]}")
+
+    fi
 
 
     for pkg in "${pkgs[@]}"; do
 
-        if [[ "$dry_run" -eq 1 ]]; then
-            "${INSTALL_PKG[@]}" "${DRYRUN_FLAG[@]}" "$pkg"
-        fi
 
 
-        if "${INSTALL_PKG[@]}" "$pkg" && printf "Package '%s' has been installed\n" "$pkg"; then
+       "${install_pkg[@]}" "$pkg"
+       local status="$?"
 
-            printf "\nPackage '%s' has been installed" "$pkg" >> "$log_install_success"
-
+        if [[ $status -eq 0 ]]; then
+         
+            printf "Package '%s' has been installed\n" "$pkg" >> "$log_success"
+        
         else
 
-            printf "\nError: Package '%s' has not been installed" "$pkg" >> "$log_install_failure"
-            #Find out why, use query!!!
-            query_repo "$pkg"
-
+            printf "Error: Package '%s' has not been installed\n" "$pkg" >> "$log_failure"
 
         fi
-        
+            
     done
 
+    
 
-    clear_space
-    print_line_separater
-    clear_space
-    cat "$log_install_success" "$log_install_failure"
-    clear_space
-    print_line_separater
-    clear_space
-    rm -f "$log_install_success" "$log_install_failure"
+
+    set_space
+    print_temp_file || return "$?"
+    set_space
+    cleanup
+
+    return 0
 
 
 }
@@ -557,160 +735,200 @@ install_packages(){
 
 update_repo(){
 
-    check_root
-    get_pkgmgr
+   
+  validate_environment || return "$?"
 
-    "${UPDATE[@]}"
+    #if dry-run is true, dry-run flag; if no-confirm flag is true, no-confirm; if both are true, then do both - figure a more efficient way to do this!
+
+    local update=("${UPDATE[@]}")
+
+
+    "${update[@]}"
+    local status="$?"
+    if [[ "$status" -ne 0 ]]; then
+
+      printf "Error: there was an issue updating the Repository!"
+      return 9
+
+    fi
+
+    return 0
 
 
 }
+
 
 
 upgrade_packages(){
 
-    check_root
-    get_pkgmgr
+    validate_environment || return "$?"
+    parse_flags_min "$@" || return "$?"
 
-    "${UPGRADE[@]}"
+
+
+    local upgrade=("${UPGRADE[@]}")
+
+    if [[ "$dry_run_check" -eq 1 ]]; then
+
+      upgrade+=("${DRYRUN_FLAG[@]}")
+
+    fi
+
+
+    if [[ "$no_confirm_check" -eq 1 ]]; then
+
+      upgrade+=("${NO_CONFIRM_FLAG[@]}")
+
+    fi
+
+
+    "${upgrade[@]}" 
+    local status="$?"
+
+    if [[ "$status" -ne 0 ]]; then
+
+      printf "\nError: There was an error during the upgrade process!\n"
+      return 10
+
+    fi
+
+    return 0
+
 
 }
+
+
+remove_packages_standard(){
+
+
+  validate_environment || return "$?"
+  parse_flags_full "$@" || return "$?"
+
+  verify_no_of_pkgs || return "$?"
+
+  local remove_pkg=("${REMOVE_PKG[@]}")
+
+
+  if [[  "$dry_run_check" -eq 1 ]]; then
+  
+    remove_pkg+=("${DRYRUN_FLAG[@]}")
+
+  fi
+
+  
+  if [[ "$no_confirm_check" -eq 1 ]]; then
+
+    remove_pkg+=("${NO_CONFIRM_FLAG[@]}")
+
+  fi
+
+
+  "${remove_pkg[@]}" "${pkgs[@]}"
+
+  
+
+}
+
 
 
 remove_packages(){
 
 
-    check_root || return "$?"
-    get_pkgmgr || return "$?"
+    validate_environment || return "$?"
+    open_temp_file || return "$?"
+    parse_flags_full "$@" || return "$?"
 
-    local log_remove_success=$(mktemp)
-    local log_remove_failure=$(mktemp)
-    trap 'rm -f "$log_remove_success" "$log_remove_failure"' EXIT INT TERM
+    verify_no_of_pkgs || return "$?"
+
+    local remove_pkg=("${REMOVE_PKG[@]}")
+         
+
     
-    local from_file=""
-    local dry_run=0
-    local pkgs=()
+    if [[ "$dry_run_check" -eq 1 ]]; then
 
-    shift
-    while [ $# -gt 0 ]; do
-        
-        case "$1" in
+        remove_pkg+=("${DRYRUN_FLAG[@]}")
 
-            --from-file)
-                from_file="$2"
-                shift 2
-            ;;
-
-            --dry-run)
-                dry_run=1
-                shift
-            ;;
-
-            --) #end of flags
-                shift
-                break
-            ;;
-
-            -*)
-                printf "Error: Invalid option: %s\n" "$1"
-                return 1
-            ;;
-
-            *)
-                pkgs+=("$1")
-                shift
-                ;;
-
-        esac
-
-    done
-
-
-        
-    #Read packages from file if given
-    if [[ -n "$from_file" ]]; then
-        while IFS= read -r line; do
-            
-            #Trim spaces
-            line="${line#"${line%%[![:space:]]*}"}"
-            line="${line%"${line##*[![:space:]]}"}"
-
-            #Skip empty lines or comment lines
-            [[ -z "$line" || "$line" =~ ^# ]] && continue
-
-            #Split line into words and append to pkgs array
-            for pkg in $line; do
-                pkgs+=("$pkg")
-            done
-        done < "$from_file"
     fi
 
+
+    if [[ "$no_confirm_check" -eq 1 ]]; then
+
+         remove_pkg+=("${NO_CONFIRM_FLAG[@]}")
+
+    fi
 
 
     for pkg in "${pkgs[@]}"; do
 
-        if [[ "$dry_run" -eq 1 ]]; then
-            "${REMOVE_PKG[@]}" "${DRYRUN_FLAG[@]}" "$pkg"
-        fi
+        #-debug 
+        #printf "DEBUG: %s\n" "${remove_pkg[*]} $pkg"
 
 
-        if "${REMOVE_PKG[@]}" "$pkg" && printf "Package '%s' has been removed\n" "$pkg"; then
+       "${remove_pkg[@]}" "$pkg"
+       local status="$?"
 
-            printf "\nPackage '%s' has been removed" "$pkg" >> "$log_remove_success"
-
+        if [[ $status -eq 0 ]]; then
+         
+            printf "Package '%s' has been removed\n" "$pkg" >> "$log_success"
+        
         else
 
-            printf "\nError: Package '%s' has not been removed" "$pkg" >> "$log_remove_failure"
-            #Find out why, use query!!!
-            query_repo "$pkg"
-
+            printf "Error: Package '%s' has not been removed\n" "$pkg" >> "$log_failure"
 
         fi
-        
+            
     done
 
 
+    set_space
+    print_temp_file || return "$?"
+    set_space
+    cleanup || return "$?"
 
-    
+    return 0
 
-
-    clear_space
-    print_line_separater
-    clear_space
-    cat "$log_remove_success" "$log_remove_failure"
-    clear_space
-    print_line_separater
-    clear_space
-    rm -f "$log_remove_success" "$log_remove_failure"
 
 }
+
 
 
 
 usage(){
 
 
-  \printf "
+  printf "
+  
   Finzell's Unified Linux Kernel Package Management Resolver - a Unified Package Management Tool for Bash & zShell compatible with Linux & MacOS
 
-  \tUsage: sc <Alias> || sc <Flag> || sc <Flag> <Alias>
+  \tUsage: fkr <Flag> <Packages> || fkr <Flag> <Flag> ... <Packages> || fkr <Flag> <Flag> ...
 
-  \t\t-> sc -l | Lists all saved Shortcuts allowing the User to change directory based-off the corresponding number entered in the terminal via User prompt
-  \t\t-> sc -fc | Checks the existence of the Database File
-  \t\t-> sc -fe | Edits the Database File using Nano, Vi, Vim, Nvim, or Emacs
-  \t\t-> sc -ff | Flushes the Database File - emptying its contents, but leaving the File there
-  \t\t-> sc -fd | Deletes the Database File
-  \t\t-> sc -fs | Shows the Database File's entries - via Cat or Less depending on the User's Database size
-  \t\t-> sc -fr | Restores the Database File's contents from an automatic backup - added safety net in the event of User error or unintended behaviour
+  \t\t-> fkr -i <Packages> || --install <Packages> | Installs the desired packages
+  \t\t-> fkr -r <Packages> || --remove  <Packages> | Removes the desired packages
+  \t\t-> fkr -is <Packages> || --install-standard <Package> Installs the desired packages in batch-order, foregoing the installation one-at-a-time 
+  \t\t-> fkr -rs <Packages> || --remove-standard <Package> Removes the desired package in batch-order, foregoing the removal one-at-a-time
   
-  \t\t-> sc <Alias> | Will change directory to the corresponding alias in the Database File
-  \t\t-> sc -c <Alias> | Creates a Shortcut to the current directory with the given Alias
-  \t\t-> sc -d <Alias> | Deletes a Shortcut from the Database with the given Alias
+  \t\t\t<Options> 
+  \t\t\t\t-> --dry-run | This will carry-out a dry-run of the above specified-operation
+  \t\t\t\t-> --noconfirm || -y | This will carry-out the above specified-operation without asking for Y/N input from the User
+  \t\t\t\t-> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
   
-  \t\tThese two functions exist for Re-installation and Uninstallation:
-  \t\t\t-> sc --reinstall | Reinstalls the script again by calling the install script
-  \t\t\t-> sc --uninstall | Uninstalls the program, removing the Alias' set in the .rc files, and removing the Man Page, as well as Deleting the Program Folder
+  \t\t-> fkr --query-pkg <Packages> || -qp <Packages> | Query the System-Installed packages
+  \t\t-> fkr --query-repo <Packages> || -qr <Packages> | Query the Package Manager's Repository
+  
+  \t\t\t<Options>
+  \t\t\t\t-> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
 
-  \tThere are more verbose Flag names that can viewed in the manual page via 'man sc'\n\n
+  \t\t-> fkr --update | This will update the system's Package Manager's Repository
+
+  \t\t-> fkr --upgrade | This will upgrade the system and packages 
+  \t\t-> fkr --update-upgrade || -uu | This will Update & Upgrade the Repo and System
+  
+  \t\t\t<Options>
+  \t\t\t\t-> --noconfirm || -y | This will carry out the above specified-operation without asking for Y/N input from the User 
+
+  \t\t-> fkr --help || fkr -h | This will bring up the Usage 
+  \t\t-> fkr --display-package-manager || -dpm | This will show the Package Manager being used by the system
+
   "
 
 
@@ -718,57 +936,117 @@ usage(){
 
 
 
-linpkg_main(){
 
+fkr_main(){
 
+  
+  
+    trap 'cleanup >/dev/null 2>&1' EXIT INT TERM
     case "$1" in
 
 
         #if $2 is --from-file, then install from file
         --install | -i)
-            install_packages "$@" || return $?
+
+            shift
+            install_packages "$@" || return "$?"
+
+        ;;
+
+
+        --install-standard | -is)
+
+          shift
+          install_packages_standard "$@" || return "$?"
+
         ;;
 
          #if $2 is --from-file, then remove from file
         --remove | -r)
-            remove_packages "$@" || return $?
+
+            shift
+            remove_packages "$@" || return "$?"
+
         ;;
 
+        
+        --remove-standard | -rs)
+
+            shift
+            remove_packages_standard "$@" || return "$?"
+
+
+        ;;
+
+        
         --query-pkg | -qp)
-            query_pkg "$@" || return $?
+
+            shift
+            query_pkg "$@" || return "$?"
+
         ;;
 
+        
         --query-repo | -qr)
-            query_repo "$@" || return $?
+
+            shift
+            query_repo "$@" || return "$?"
+
         ;;
 
+        
         --update)
-            update_repo || return $?
+
+            shift
+            update_repo || return "$?" 
+
         ;;
 
+        
         --upgrade)
-            upgrade_packages
+
+            shift
+            upgrade_packages || return "$?"
+
         ;;
 
+      
         --update-upgrade | -uu)
+
+            shift
             update_repo
             upgrade_packages
+
+        ;;
+
+  
+        --display-package-manager | -dpm)
+
+          shift
+          display_package_manager 
+
         ;;
 
         --help | -h)
+
+            shift
             usage
+
         ;;
         
         *)
             printf "Error: Invalid argument!"
             clear_space
             usage
+            return 8
+
         ;;
 
-    esac
+    esac    
+    
+    return 0
 
 }
 
 
-
-linpkg_main "$@"
+fkr_main "$@"
