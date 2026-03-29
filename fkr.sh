@@ -5,17 +5,18 @@
 #-A way to standardize and make managing packages across multple distros easier
 #-Will begin with Pacman, Apt, dnf, apk, brew & Zypper cuz I need them for Containers and my MacOS
 #-More can, and maybe will be, added in the future, like Unix Package Managers - I can't think of any more except for NixOS... but that's done through a Config file - will see in the future  
-#-I will not be doing this for Portage - that's it's own thing, and using Emerge makes more sense, especially as it pertains to necessary output regarding USE Flags and Masks etc.
+#-I will not be doing this for Portage - that's its own thing, and using Emerge makes more sense, especially as it pertains to necessary output regarding USE Flags and Masks etc.
 
 #### Returns ####
 # 
-#-Return 2: Unsupported Package Manager
-#-Return 3: Invalid Super User privileges
-#-Return 4: No Packages Specified
+#-Return 2: Error: Unsupported Package Manager
+#-Return 3: Error: Invalid Super User privileges
+#-Return 4: Error: No Packages Specified
 #-Return 5: Error finding input file
 #-Return 6: Error writing to temporary log
 #-Return 7: Error cleaning temporary logs from memory
-#-Return 8: Invalid Flag
+#-Return 8: Error: Invalid Flag
+#-Return 9: Error: Updating the Repository 
 
 
 
@@ -55,14 +56,14 @@ check_root(){
     fi
 
     #test for sudo or doas
-    if command -v doas >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
         
-        root=(doas)
+        root=(sudo)
         ROOT=("${root[@]}")
 
-    elif command -v sudo >/dev/null 2>&1; then
+    elif command -v doas >/dev/null 2>&1; then
 
-        root=(sudo)
+        root=(doas)
         ROOT=("${root[@]}")
 
     else
@@ -141,8 +142,8 @@ get_pkgmgr(){
 
         INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install -y)
         REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove -y)
-        QUERY_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" search --installed-only)
-        QUERY_REPO=("${ROOT[@]}" "${PKGMNGR[@]}" info)
+        QUERY_PKG=("${PKGMNGR[@]}" search --installed-only)
+        QUERY_REPO=("${PKGMNGR[@]}" info)
 
         UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" refresh)
         UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
@@ -222,11 +223,27 @@ get_pkgmgr(){
 }
 
 
+
 display_package_manager(){
 
-  get_pkgmgr
 
-  printf "\nYou are currently using %s\n\n" "${PKGMNGR[@]}"
+
+    #make this more portable for user`s so they can include it in other scripts so they don't have to write their own pkgmngr detection
+    #not sourced so can't export var, and making them use eval would be a pain in the fkn ass
+
+    #So User can, in their own scripts, now use - 
+    # "pkgmngr=$(fkr -dpm)"
+    # if [[ $pkgmngr == "pacman" ]]; then 
+    #   do whatever
+    # fi
+    #
+    #If return status is 2, then the package manager is unsupported, so best test for that first!
+    
+
+    get_pkgmgr || return "$?"
+
+        printf "%s\n" "${PKGMNGR[@]}"
+        return 0
 
 
 }
@@ -283,15 +300,15 @@ print_temp_file(){
   #Forego Cat just in case it doesn't exist - like in a very minimal container;
 
 
-        for log_file in "$log_success" "$log_failure"; do
+    for log_file in "$log_success" "$log_failure"; do
 
-            while IFS= read -r line; do
+        while IFS= read -r line; do
 
-              printf "%s\n" "$line"
+            printf "%s\n" "$line"
 
-            done < "$log_file"
+        done < "$log_file"
 
-        done
+    done
 
 
 }
@@ -332,7 +349,7 @@ read_pkg_from_file(){
     pkgs=()
 
     if [[ ! -f "$user_defined_pkg_file" ]]; then 
-        printf "\nError: cannot find file '%s'!\n" "$user_defined_pkg_file"
+        printf "\nError: cannot find file '%s'!\n\n" "$user_defined_pkg_file"
         return 5
     fi
 
@@ -375,36 +392,31 @@ parse_flags_min(){
 
     while (($# > 0)); do 
 
-      case "$1" in 
+        case "$1" in 
 
-        --dry-run)
-          dry_run_check=1
-          shift
-      ;;
+            --dry-run)
+            dry_run_check=1
+            shift
+            ;;
 
-      --noconfirm | -y)
-        no_confirm_check=1
-        shift
+        --noconfirm | -y)
+            no_confirm_check=1
+            shift
+            ;;
 
-      ;;
+        --)
+            shift 
+            break
+        ;;
 
-      --)
-
-        shift 
-        break
-      
-      ;;
-
-      *)
-      
-        printf "\nError: this is an invalid flag!\n"
-        usage
-        return 8
-      ;;
+        *)
+            printf "\nError: this is an invalid flag!\n"
+            usage
+            return 8
+        ;;
+            
+        esac
         
-      esac
-    
-    shift
     done
 
     return 0
@@ -418,11 +430,14 @@ parse_flags_min(){
  parse_flags_full(){
 
 
+
     user_defined_pkg_file=""
     dry_run_check=0
     no_confirm_check=0
     pkgs=()
     pkg_overflow_check=0
+
+   
 
     while (($# > 0)); do
     
@@ -430,7 +445,7 @@ parse_flags_min(){
 
             --from-file)
                 if [[ -z "$2" || "$2" == -* ]]; then
-                    printf "\nError: '--from-file' requires a valid file path\n"
+                    printf "\nError: '--from-file' requires a valid file path\n\n"
                     return 8
                 fi
 
@@ -587,52 +602,52 @@ query_repo(){
 
 
 
-  validate_environment || return "$?"
-  open_temp_file || return "$?"
-  parse_flags_full "$@" || return "$?"
+    validate_environment || return "$?"
+    open_temp_file || return "$?"
+    parse_flags_full "$@" || return "$?"
 
-  verify_no_of_pkgs || return "$?"
+    verify_no_of_pkgs || return "$?"
 
-  local query_repo=("${QUERY_REPO[@]}")
-
-
-  if [[ "$dry_run_check" -eq 1 ]]; then 
-  
-    query_repo+=("${DRYRUN_FLAG[@]}")
-
-  fi
+    local query_repo=("${QUERY_REPO[@]}")
 
 
-  if [[ "$no_confirm_check" -eq 1 ]]; then
-
-    query_repo+=("${NO_CONFIRM_FLAG[@]}")
-
-  fi
-
-
-  for pkg in "${pkgs[@]}"; do
-
-    "${query_repo[@]}" "$pkg"
-
-    local status="$?"
+    if [[ "$dry_run_check" -eq 1 ]]; then 
     
-    if [[ "$status" -eq 0 ]]; then
-        
-      printf "Package '%s' exists in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_success" \
-      
-    else
-      
-      printf "Package '%s' not found in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_failure"
+        query_repo+=("${DRYRUN_FLAG[@]}")
 
     fi
-    
-  done
 
 
-    set_space
-    print_temp_file || return "$?"
-    set_space
-    cleanup || return "$?"
+    if [[ "$no_confirm_check" -eq 1 ]]; then
+
+        query_repo+=("${NO_CONFIRM_FLAG[@]}")
+
+    fi
+
+
+    for pkg in "${pkgs[@]}"; do
+
+        "${query_repo[@]}" "$pkg"
+
+        local status="$?"
+        
+        if [[ "$status" -eq 0 ]]; then
+            
+        printf "Package '%s' exists in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_success" \
+        
+        else
+        
+        printf "Package '%s' not found in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_failure"
+
+        fi
+        
+    done
+
+
+        set_space
+        print_temp_file || return "$?"
+        set_space
+        cleanup
     
 
 }
@@ -641,30 +656,30 @@ query_repo(){
 install_packages_standard(){
 
 
-  validate_environment || return "$?"
-  parse_flags_full "$@" || return "$?"
+    validate_environment || return "$?"
+    parse_flags_full "$@" || return "$?"
 
-  verify_no_of_pkgs || return "$?"
+    verify_no_of_pkgs || return "$?"
 
-  local install_pkg=("${INSTALL_PKG[@]}")
+    local install_pkg=("${INSTALL_PKG[@]}")
 
 
-  
-  if [[ "$dry_run_check" -eq 1 ]]; then
+    
+    if [[ "$dry_run_check" -eq 1 ]]; then
 
-    install_pkg+=("${DRYRUN_FLAG[@]}")
+        install_pkg+=("${DRYRUN_FLAG[@]}")
 
-  fi 
+    fi 
 
-  
-  if [[ "$no_confirm_check" -eq 1 ]]; then
+    
+    if [[ "$no_confirm_check" -eq 1 ]]; then
 
-    install_pkg+=("${NO_CONFIRM_FLAG[@]}")
+        install_pkg+=("${NO_CONFIRM_FLAG[@]}")
 
-  fi
+    fi
 
-  
-  "${install_pkg[@]}" "${pkgs[@]}"
+    
+    "${install_pkg[@]}" "${pkgs[@]}"
 
 
 }
@@ -735,7 +750,7 @@ install_packages(){
 
 update_repo(){
 
-   
+
   validate_environment || return "$?"
 
     #if dry-run is true, dry-run flag; if no-confirm flag is true, no-confirm; if both are true, then do both - figure a more efficient way to do this!
@@ -747,7 +762,7 @@ update_repo(){
     local status="$?"
     if [[ "$status" -ne 0 ]]; then
 
-      printf "Error: there was an issue updating the Repository!"
+      printf "\nError: there was an issue updating the Repository!\n\n"
       return 9
 
     fi
@@ -787,7 +802,7 @@ upgrade_packages(){
 
     if [[ "$status" -ne 0 ]]; then
 
-      printf "\nError: There was an error during the upgrade process!\n"
+      printf "\nError: There was an error during the upgrade process!\n\n"
       return 10
 
     fi
@@ -801,29 +816,29 @@ upgrade_packages(){
 remove_packages_standard(){
 
 
-  validate_environment || return "$?"
-  parse_flags_full "$@" || return "$?"
+    validate_environment || return "$?"
+    parse_flags_full "$@" || return "$?"
 
-  verify_no_of_pkgs || return "$?"
+    verify_no_of_pkgs || return "$?"
 
-  local remove_pkg=("${REMOVE_PKG[@]}")
-
-
-  if [[  "$dry_run_check" -eq 1 ]]; then
-  
-    remove_pkg+=("${DRYRUN_FLAG[@]}")
-
-  fi
-
-  
-  if [[ "$no_confirm_check" -eq 1 ]]; then
-
-    remove_pkg+=("${NO_CONFIRM_FLAG[@]}")
-
-  fi
+    local remove_pkg=("${REMOVE_PKG[@]}")
 
 
-  "${remove_pkg[@]}" "${pkgs[@]}"
+    if [[  "$dry_run_check" -eq 1 ]]; then
+    
+        remove_pkg+=("${DRYRUN_FLAG[@]}")
+
+    fi
+
+    
+    if [[ "$no_confirm_check" -eq 1 ]]; then
+
+        remove_pkg+=("${NO_CONFIRM_FLAG[@]}")
+
+    fi
+
+
+    "${remove_pkg[@]}" "${pkgs[@]}"
 
   
 
@@ -896,40 +911,40 @@ remove_packages(){
 usage(){
 
 
-  printf "
-  
-  Finzell's Unified Linux Kernel Package Management Resolver - a Unified Package Management Tool for Bash & zShell compatible with Linux & MacOS
+    printf "
+    
+    Finzell's Unified Linux Kernel Package Management Resolver - a Unified Package Management Tool for Bash & zShell compatible with Linux & MacOS
 
-  \tUsage: fkr <Flag> <Packages> || fkr <Flag> <Flag> ... <Packages> || fkr <Flag> <Flag> ...
+    \tUsage: fkr <Flag> <Packages> || fkr <Flag> <Flag> ... <Packages> || fkr <Flag> <Flag> ...
 
-  \t\t-> fkr -i <Packages> || --install <Packages> | Installs the desired packages
-  \t\t-> fkr -r <Packages> || --remove  <Packages> | Removes the desired packages
-  \t\t-> fkr -is <Packages> || --install-standard <Package> Installs the desired packages in batch-order, foregoing the installation one-at-a-time 
-  \t\t-> fkr -rs <Packages> || --remove-standard <Package> Removes the desired package in batch-order, foregoing the removal one-at-a-time
-  
-  \t\t\t<Options> 
-  \t\t\t\t-> --dry-run | This will carry-out a dry-run of the above specified-operation
-  \t\t\t\t-> --noconfirm || -y | This will carry-out the above specified-operation without asking for Y/N input from the User
-  \t\t\t\t-> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
-  
-  \t\t-> fkr --query-pkg <Packages> || -qp <Packages> | Query the System-Installed packages
-  \t\t-> fkr --query-repo <Packages> || -qr <Packages> | Query the Package Manager's Repository
-  
-  \t\t\t<Options>
-  \t\t\t\t-> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
+    \t\t-> fkr -i <Packages> || --install <Packages> | Installs the desired packages
+    \t\t-> fkr -r <Packages> || --remove  <Packages> | Removes the desired packages
+    \t\t-> fkr -is <Packages> || --install-standard <Package> Installs the desired packages in batch-order, foregoing the installation one-at-a-time 
+    \t\t-> fkr -rs <Packages> || --remove-standard <Package> Removes the desired package in batch-order, foregoing the removal one-at-a-time
+    
+    \t\t\t<Options> 
+    \t\t\t\t-> --dry-run | This will carry-out a dry-run of the above specified-operation
+    \t\t\t\t-> --noconfirm || -y | This will carry-out the above specified-operation without asking for Y/N input from the User
+    \t\t\t\t-> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
+    
+    \t\t-> fkr --query-pkg <Packages> || -qp <Packages> | Query the System-Installed packages
+    \t\t-> fkr --query-repo <Packages> || -qr <Packages> | Query the Package Manager's Repository
+    
+    \t\t\t<Options>
+    \t\t\t\t-> --from-file <File> | This will carry-out the above specified-operation taking packages as input from a specified file
 
-  \t\t-> fkr --update | This will update the system's Package Manager's Repository
+    \t\t-> fkr --update | This will update the system's Package Manager's Repository
 
-  \t\t-> fkr --upgrade | This will upgrade the system and packages 
-  \t\t-> fkr --update-upgrade || -uu | This will Update & Upgrade the Repo and System
-  
-  \t\t\t<Options>
-  \t\t\t\t-> --noconfirm || -y | This will carry out the above specified-operation without asking for Y/N input from the User 
+    \t\t-> fkr --upgrade | This will upgrade the system and packages 
+    \t\t-> fkr --update-upgrade || -uu | This will Update & Upgrade the Repo and System
+    
+    \t\t\t<Options>
+    \t\t\t\t-> --noconfirm || -y | This will carry out the above specified-operation without asking for Y/N input from the User 
 
-  \t\t-> fkr --help || fkr -h | This will bring up the Usage 
-  \t\t-> fkr --display-package-manager || -dpm | This will show the Package Manager being used by the system
+    \t\t-> fkr --help || fkr -h | This will bring up the Usage 
+    \t\t-> fkr --display-package-manager || -dpm | This will show the Package Manager being used by the system
 
-  "
+    "
 
 
 }
@@ -940,14 +955,17 @@ usage(){
 fkr_main(){
 
   
-  
     trap 'cleanup >/dev/null 2>&1' EXIT INT TERM
-    case "$1" in
+    
+
+    local arg="$1"
+
+    case "$arg" in
 
 
         #if $2 is --from-file, then install from file
         --install | -i)
-
+            
             shift
             install_packages "$@" || return "$?"
 
@@ -975,12 +993,11 @@ fkr_main(){
             shift
             remove_packages_standard "$@" || return "$?"
 
-
         ;;
 
         
         --query-pkg | -qp)
-
+              
             shift
             query_pkg "$@" || return "$?"
 
@@ -996,8 +1013,14 @@ fkr_main(){
 
         
         --update)
+      
+            if (($# != 1)); then
 
-            shift
+              printf "\nError: Invalid flags!\n\n"
+              return 8
+
+            fi
+            
             update_repo || return "$?" 
 
         ;;
@@ -1006,7 +1029,7 @@ fkr_main(){
         --upgrade)
 
             shift
-            upgrade_packages || return "$?"
+            upgrade_packages "$@" || return "$?"
 
         ;;
 
@@ -1014,28 +1037,40 @@ fkr_main(){
         --update-upgrade | -uu)
 
             shift
-            update_repo
-            upgrade_packages
+            update_repo || return "$?"
+            upgrade_packages "$@" || return "$?"
 
         ;;
 
   
         --display-package-manager | -dpm)
 
-          shift
-          display_package_manager 
+          if (($# != 1)); then
+            printf "\nError: Invalid flags!\n\n"
+            return 8
+          fi 
+
+          display_package_manager || return "$?"
 
         ;;
 
+
         --help | -h)
 
-            shift
-            usage
+          if (($# != 1)); then
+
+            printf "\nError: Invalid flags!\n\n"
+            return 8
+          
+          fi
+
+            usage || return "$?"
 
         ;;
         
         *)
-            printf "Error: Invalid argument!"
+           
+          printf "\nError: Invalid argument!"
             clear_space
             usage
             return 8
