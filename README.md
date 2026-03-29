@@ -91,4 +91,28 @@ Finzell's Unified Linux Kernel Package Management Resolver - a Unified Package M
     Note: there is a --from-file and --dry-run flag, but I need to improve their functionality and handling.
 
    ```
+
+# Update 29/03/26
+
+Fixes to some flag issues - Very embarrassing, but I forgot to pass args to Upgrade
+
+Fixes to Error messages
+
+Improved flag handling for --help, -dpm, and update
+
+-dpm now outputs a simplified output pertaining to the Package Manager in-use, so it can be more portable for use in your scripts so you don't have to go through the effort of doing your own detection:
+
+```
+So User can, in their own scripts, now use - 
+    pkgmngr=$(fkr -dpm)
+    if [[ $pkgmngr == "pacman" ]]; then 
+        do whatever
+    fi
+    
+Note: If return status is 2, then the package manager is unsupported, so best test for that first!
+```
+
+More testing on VMs: OpenSuse Leap, Fedora, CentOS Stream, Arch (WSL & VMs)
+
+I still didn't do xbps support because querying always returns 0, regardless of whether a package exists or not - so I'll have to do some shit to account for that...
     
