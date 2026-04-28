@@ -45,7 +45,7 @@ NO_CONFIRM_FLAG=()
 check_root(){
 
 
-    local root=""
+    local root=()
 
     #check for current privilege status
     if [[ "$EUID" -eq 0 ]]; then 
@@ -68,7 +68,7 @@ check_root(){
 
     else
 
-        printf "\n\nError: You need root privilege to run this - Sudo nor Doas appear to be installed!\n\n"
+        \printf "\n\nError: You need root privilege to run this - Sudo nor Doas appear to be installed!\n\n"
         return 3
 
     fi 
@@ -87,50 +87,50 @@ get_pkgmgr(){
 
     if command -v apt-get >/dev/null 2>&1; then 
 
-        PKGMNGR=(apt-get)
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove)
-        QUERY_PKG=(dpkg -s)
-        QUERY_REPO=(apt-cache show)
+        PKGMNGR=("apt-get")
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "install")
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "remove")
+        QUERY_PKG=("dpkg" "-s")
+        QUERY_REPO=("apt-cache" "show")
 
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" "update")
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" "upgrade")
 
-        NO_CONFIRM_FLAG=(-y)
-        DRYRUN_FLAG=(-s)
+        NO_CONFIRM_FLAG=("-y")
+        DRYRUN_FLAG=("-s")
         
         return 0
 
 
     elif command -v dnf >/dev/null 2>&1; then 
 
-        PKGMNGR=(dnf)
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove)
-        QUERY_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" list installed)
-        QUERY_REPO=("${ROOT[@]}" "${PKGMNGR[@]}" info)
+        PKGMNGR=("dnf")
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "install")
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "remove")
+        QUERY_PKG=("${PKGMNGR[@]}" "list" "installed")
+        QUERY_REPO=("${PKGMNGR[@]}" "info")
 
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" check-update)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" "check-update")
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" "upgrade")
 
-        NO_CONFIRM_FLAG=(-y)
-        DRYRUN_FLAG=(--assumeno)
+        NO_CONFIRM_FLAG=("-y")
+        DRYRUN_FLAG=("--assumeno")
 
         return 0
 
     elif command -v pacman >/dev/null 2>&1; then 
 
-        PKGMNGR=(pacman)
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -S)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" -R)
-        QUERY_PKG=("${PKGMNGR[@]}" -Q)
-        QUERY_REPO=("${PKGMNGR[@]}" -Si)
+        PKGMNGR=("pacman")
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "-S")
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "-R")
+        QUERY_PKG=("${PKGMNGR[@]}" "-Q")
+        QUERY_REPO=("${PKGMNGR[@]}" "-Si")
 
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" -Sy)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" -Syu)
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" "-Sy")
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" "-Syu")
 
-        NO_CONFIRM_FLAG=(--noconfirm)
-        DRYRUN_FLAG=(--print)
+        NO_CONFIRM_FLAG=("--noconfirm")
+        DRYRUN_FLAG=("--print")
 
         return 0
 
@@ -138,18 +138,18 @@ get_pkgmgr(){
 
     elif command -v zypper >/dev/null 2>&1; then
 
-        PKGMNGR=(zypper)
+        PKGMNGR=("zypper")
 
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" install -y)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" remove -y)
-        QUERY_PKG=("${PKGMNGR[@]}" search --installed-only)
-        QUERY_REPO=("${PKGMNGR[@]}" info)
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "install" "-y")
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "remove" "-y")
+        QUERY_PKG=("${PKGMNGR[@]}" "search" "--installed-only")
+        QUERY_REPO=("${PKGMNGR[@]}" "info")
 
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" refresh)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" "refresh")
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" "update")
 
-        NO_CONFIRM_FLAG=(-y)
-        DRYRUN_FLAG=(--dry-run)
+        NO_CONFIRM_FLAG=("-y")
+        DRYRUN_FLAG=("--dry-run")
 
         return 0
 
@@ -159,36 +159,36 @@ get_pkgmgr(){
     #Check if brew needs Root, because I don't recall ever using sudo with brew ever!
     #And I think it's --cask for CLI Tools specifically, which is all I care about!
 
-        PKGMNGR=(brew)
+        PKGMNGR=("brew")
 
-        INSTALL_PKG=("${PKGMNGR[@]}" install)
-        REMOVE_PKG=("${PKGMNGR[@]}" uninstall)
-        QUERY_PKG=("${PKGMNGR[@]}" list)
-        QUERY_REPO=("${PKGMNGR[@]}" info)
+        INSTALL_PKG=("${PKGMNGR[@]}" "install")
+        REMOVE_PKG=("${PKGMNGR[@]}" "uninstall")
+        QUERY_PKG=("${PKGMNGR[@]}" "list")
+        QUERY_REPO=("${PKGMNGR[@]}" "info")
 
-        UPDATE=("${PKGMNGR[@]}" update)
-        UPGRADE=("${PKGMNGR[@]}" upgrade)
+        UPDATE=("${PKGMNGR[@]}" "update")
+        UPGRADE=("${PKGMNGR[@]}" "upgrade")
 
         NO_CONFIRM_FLAG=()
-        DRYRUN_FLAG=(--dry-run)
+        DRYRUN_FLAG=("--dry-run")
 
         return 0
 
     
     elif command -v apk >/dev/null 2>&1; then 
 
-        PKGMNGR=(apk)
+        PKGMNGR=("apk")
 
-        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" add)
-        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" del)
-        QUERY_PKG=("${PKGMNGR[@]}" info -e)
-        QUERY_REPO=("${PKGMNGR[@]}" info)
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "add")
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "del")
+        QUERY_PKG=("${PKGMNGR[@]}" "info" "-e")
+        QUERY_REPO=("${PKGMNGR[@]}" "info")
 
-        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" update)
-        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" upgrade)
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" "update")
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" "upgrade")
 
         NO_CONFIRM_FLAG=()
-        DRYRUN_FLAG=(--simulate)
+        DRYRUN_FLAG=("--simulate")
 
         return 0
 
@@ -214,7 +214,7 @@ get_pkgmgr(){
 
     else 
 
-        printf "\nError, this is an unsupported Package Manager!\n\n"
+        \printf "\nError, this is an unsupported Package Manager!\n\n"
         return 2 
     
     fi
@@ -242,7 +242,7 @@ display_package_manager(){
 
     get_pkgmgr || return "$?"
 
-        printf "%s\n" "${PKGMNGR[@]}"
+        \printf "%s\n" "${PKGMNGR[@]}"
         return 0
 
 
@@ -253,7 +253,7 @@ display_package_manager(){
 clear_space(){
 
 
-    printf "\n\n"
+    \printf "\n\n"
 
 
 }
@@ -264,7 +264,7 @@ clear_space(){
 print_line_separator(){
 
 
-    printf "\n__________________________________________________________________________________________\n"
+    \printf "\n__________________________________________________________________________________________\n"
 
 
 }
@@ -287,7 +287,7 @@ cleanup(){
 
    
     
-    rm -f "$log_success" "$log_failure"
+    \rm -f "$log_success" "$log_failure"
 
 
 }
@@ -304,7 +304,7 @@ print_temp_file(){
 
         while IFS= read -r line; do
 
-            printf "%s\n" "$line"
+            \printf "%s\n" "$line"
 
         done < "$log_file"
 
@@ -349,7 +349,7 @@ read_pkg_from_file(){
     pkgs=()
 
     if [[ ! -f "$user_defined_pkg_file" ]]; then 
-        printf "\nError: cannot find file '%s'!\n\n" "$user_defined_pkg_file"
+        \printf "\nError: cannot find file '%s'!\n\n" "$user_defined_pkg_file"
         return 5
     fi
 
@@ -445,13 +445,13 @@ parse_flags_min(){
 
             --from-file)
                 if [[ -z "$2" || "$2" == -* ]]; then
-                    printf "\nError: '--from-file' requires a valid file path\n\n"
+                    \printf "\nError: '--from-file' requires a valid file path\n\n"
                     return 8
                 fi
 
                 #Stops a combining of pkg input plus from file input
                 if [[ "${#pkgs[@]}" -gt 0 ]]; then
-                    printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
+                    \printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
 
                     return 8
                 fi
@@ -484,7 +484,7 @@ parse_flags_min(){
 
             -*)
                 #Invalid flag - usage()
-                printf "\nError: This is an invalid flag\n\n"
+                \printf "\nError: This is an invalid flag\n\n"
                 usage
                 return 8 
             ;;
@@ -493,7 +493,7 @@ parse_flags_min(){
 
                 if [[ "$pkg_overflow_check" -eq 1 ]]; then
                     
-                    printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
+                    \printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
                     return 8
 
                 fi
@@ -524,7 +524,7 @@ verify_no_of_pkgs(){
   
     if [[ "${#pkgs[@]}" -eq 0 ]]; then
 
-      printf "Error: No Packages have been specified!"
+      \printf "Error: No Packages have been specified!"
       return 4
 
     fi
@@ -574,11 +574,11 @@ query_pkg(){
 
       if [[ "$status" -eq 0 ]]; then
           
-        printf "Package '%s' exists\n" "$pkg" >> "$log_success" \
+        \printf "Package '%s' exists\n" "$pkg" >> "$log_success" \
       
       else
         
-        printf "Package '%s' not found\n" "$pkg" >> "$log_failure"
+        \printf "Package '%s' not found\n" "$pkg" >> "$log_failure"
 
       fi
     
@@ -633,11 +633,11 @@ query_repo(){
         
         if [[ "$status" -eq 0 ]]; then
             
-        printf "Package '%s' exists in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_success" \
+        \printf "Package '%s' exists in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_success" \
         
         else
         
-        printf "Package '%s' not found in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_failure"
+        \printf "Package '%s' not found in the %s Repo\n" "$pkg" "${PKGMNGR[@]}" >> "$log_failure"
 
         fi
         
@@ -723,11 +723,11 @@ install_packages(){
 
         if [[ $status -eq 0 ]]; then
          
-            printf "Package '%s' has been installed\n" "$pkg" >> "$log_success"
+            \printf "Package '%s' has been installed\n" "$pkg" >> "$log_success"
         
         else
 
-            printf "Error: Package '%s' has not been installed\n" "$pkg" >> "$log_failure"
+            \printf "Error: Package '%s' has not been installed\n" "$pkg" >> "$log_failure"
 
         fi
             
@@ -762,7 +762,7 @@ update_repo(){
     local status="$?"
     if [[ "$status" -ne 0 ]]; then
 
-      printf "\nError: there was an issue updating the Repository!\n\n"
+      \printf "\nError: there was an issue updating the Repository!\n\n"
       return 9
 
     fi
@@ -802,7 +802,7 @@ upgrade_packages(){
 
     if [[ "$status" -ne 0 ]]; then
 
-      printf "\nError: There was an error during the upgrade process!\n\n"
+      \printf "\nError: There was an error during the upgrade process!\n\n"
       return 10
 
     fi
@@ -884,11 +884,11 @@ remove_packages(){
 
         if [[ $status -eq 0 ]]; then
          
-            printf "Package '%s' has been removed\n" "$pkg" >> "$log_success"
+            \printf "Package '%s' has been removed\n" "$pkg" >> "$log_success"
         
         else
 
-            printf "Error: Package '%s' has not been removed\n" "$pkg" >> "$log_failure"
+            \printf "Error: Package '%s' has not been removed\n" "$pkg" >> "$log_failure"
 
         fi
             
@@ -911,7 +911,7 @@ remove_packages(){
 usage(){
 
 
-    printf "
+    \printf "
     
     Finzell's Unified Linux Kernel Package Management Resolver - a Unified Package Management Tool for Bash & zShell compatible with Linux & MacOS
 
@@ -1016,7 +1016,7 @@ fkr_main(){
       
             if (($# != 1)); then
 
-              printf "\nError: Invalid flags!\n\n"
+              \printf "\nError: Invalid flags!\n\n"
               return 8
 
             fi
@@ -1046,7 +1046,7 @@ fkr_main(){
         --display-package-manager | -dpm)
 
           if (($# != 1)); then
-            printf "\nError: Invalid flags!\n\n"
+            \printf "\nError: Invalid flags!\n\n"
             return 8
           fi 
 
@@ -1059,7 +1059,7 @@ fkr_main(){
 
           if (($# != 1)); then
 
-            printf "\nError: Invalid flags!\n\n"
+            \printf "\nError: Invalid flags!\n\n"
             return 8
           
           fi
@@ -1070,7 +1070,7 @@ fkr_main(){
         
         *)
            
-          printf "\nError: Invalid argument!"
+          \printf "\nError: Invalid argument!"
             clear_space
             usage
             return 8
