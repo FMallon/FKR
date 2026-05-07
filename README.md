@@ -11,9 +11,10 @@ cd /var/opt && sudo git clone https://github.com/FMallon/FKR && cd FKR && sudo c
 This will depend on your $PATH and setup - MacOS doesn't have /var/opt for example, so just use /opt/.
 
 # Note
-This is still in the testing stages! There are still some things that I need to fix!
 
-So far, it should work for APT, DNF, Pacman, Zypper, APK, Brew to do the basics.
+This has been tested extensively in hundreds of minimal Podman containers - on Arm64 and Amd64 architectures (Fedora, Nginx, Arch, Debian, Ubuntu) and I have had no failures, so I feel confident in saying that it works absolutely well for its intended Use-Case!
+
+It should work for APT, DNF, Pacman, Zypper, APK, Brew to do the basics - but it is dependent on Bash Version 4+.
 
 The idea behind this script is to unify a single command to do 90% of the Package Manager's use-case via unified commands.  This stems from a old idea I had when I was adding alias' to my .bashrc to achieve a similar purpose.  Recently, I've been working on a project involving container set-up, and this was something I needed in order to set up multiple containers of multiple distros.
 
