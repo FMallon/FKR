@@ -68,7 +68,7 @@ check_root(){
 
     else
 
-        \printf "\n\nError: You need root privilege to run this - Sudo nor Doas appear to be installed!\n\n"
+        \printf "\n\n[ERROR] You need root privilege to run this - Sudo nor Doas appear to be installed!\n\n"
         return 3
 
     fi 
@@ -105,6 +105,23 @@ get_pkgmgr(){
     elif command -v dnf >/dev/null 2>&1; then 
 
         PKGMNGR=("dnf")
+        INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "install")
+        REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "remove")
+        QUERY_PKG=("${PKGMNGR[@]}" "list" "installed")
+        QUERY_REPO=("${PKGMNGR[@]}" "info")
+
+        UPDATE=("${ROOT[@]}" "${PKGMNGR[@]}" "check-update")
+        UPGRADE=("${ROOT[@]}" "${PKGMNGR[@]}" "upgrade")
+
+        NO_CONFIRM_FLAG=("-y")
+        DRYRUN_FLAG=("--assumeno")
+
+        return 0
+
+#Testing
+    elif command -v yum >/dev/null 2>&1; then 
+
+        PKGMNGR=("yum")
         INSTALL_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "install")
         REMOVE_PKG=("${ROOT[@]}" "${PKGMNGR[@]}" "remove")
         QUERY_PKG=("${PKGMNGR[@]}" "list" "installed")
@@ -331,7 +348,6 @@ open_temp_file(){
 validate_environment(){
 
 
-    check_root || return "$?"
     get_pkgmgr || return "$?"
     
     return 0    
@@ -349,14 +365,18 @@ read_pkg_from_file(){
     pkgs=()
 
     if [[ ! -f "$user_defined_pkg_file" ]]; then 
-        \printf "\nError: cannot find file '%s'!\n\n" "$user_defined_pkg_file"
+
+        \printf "\n[ERROR] cannot find file '%s'!\n\n" "$user_defined_pkg_file"
         return 5
+
     fi
 
     while IFS= read -r pkg; do
 
         if [[ "$pkg" =~ ^# ]]; then
+
             continue
+
         fi
         
         if [[ -z "$pkg" ]]; then
@@ -410,7 +430,7 @@ parse_flags_min(){
         ;;
 
         *)
-            printf "\nError: this is an invalid flag!\n"
+            printf "\n[ERROR] this is an invalid flag!\n"
             usage
             return 8
         ;;
@@ -445,13 +465,13 @@ parse_flags_min(){
 
             --from-file)
                 if [[ -z "$2" || "$2" == -* ]]; then
-                    \printf "\nError: '--from-file' requires a valid file path\n\n"
+                    \printf "\n[ERROR] '--from-file' requires a valid file path\n\n"
                     return 8
                 fi
 
                 #Stops a combining of pkg input plus from file input
                 if [[ "${#pkgs[@]}" -gt 0 ]]; then
-                    \printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
+                    \printf "\n[ERROR] Cannot combine '--from-file' with direct package arguments\n\n"
 
                     return 8
                 fi
@@ -484,7 +504,7 @@ parse_flags_min(){
 
             -*)
                 #Invalid flag - usage()
-                \printf "\nError: This is an invalid flag\n\n"
+                \printf "\n[ERROR] This is an invalid flag\n\n"
                 usage
                 return 8 
             ;;
@@ -493,7 +513,7 @@ parse_flags_min(){
 
                 if [[ "$pkg_overflow_check" -eq 1 ]]; then
                     
-                    \printf "\nError: Cannot combine '--from-file' with direct package arguments\n\n"
+                    \printf "\n[ERROR] Cannot combine '--from-file' with direct package arguments\n\n"
                     return 8
 
                 fi
@@ -524,7 +544,7 @@ verify_no_of_pkgs(){
   
     if [[ "${#pkgs[@]}" -eq 0 ]]; then
 
-      \printf "Error: No Packages have been specified!"
+      \printf "[ERROR] No Packages have been specified!"
       return 4
 
     fi
@@ -656,6 +676,9 @@ query_repo(){
 install_packages_standard(){
 
 
+
+    check_root || return "$?"
+
     validate_environment || return "$?"
     parse_flags_full "$@" || return "$?"
 
@@ -690,6 +713,8 @@ install_packages(){
 
 
 
+    check_root || return "$?"
+
     validate_environment || return "$?"
     open_temp_file || return "$?"
     parse_flags_full "$@" || return "$?"
@@ -723,11 +748,11 @@ install_packages(){
 
         if [[ $status -eq 0 ]]; then
          
-            \printf "Package '%s' has been installed\n" "$pkg" >> "$log_success"
+            \printf "[SUCCESS] Package '%s' has been installed\n" "$pkg" >> "$log_success"
         
         else
 
-            \printf "Error: Package '%s' has not been installed\n" "$pkg" >> "$log_failure"
+            \printf "[ERROR] Package '%s' has not been installed\n" "$pkg" >> "$log_failure"
 
         fi
             
@@ -751,7 +776,10 @@ install_packages(){
 update_repo(){
 
 
-  validate_environment || return "$?"
+
+    check_root || return "$?"
+
+    validate_environment || return "$?"
 
     #if dry-run is true, dry-run flag; if no-confirm flag is true, no-confirm; if both are true, then do both - figure a more efficient way to do this!
 
@@ -762,7 +790,7 @@ update_repo(){
     local status="$?"
     if [[ "$status" -ne 0 ]]; then
 
-      \printf "\nError: there was an issue updating the Repository!\n\n"
+      \printf "\n[ERROR] there was an issue updating the Repository!\n\n"
       return 9
 
     fi
@@ -776,9 +804,11 @@ update_repo(){
 
 upgrade_packages(){
 
+
+    check_root || return "$?"
+
     validate_environment || return "$?"
     parse_flags_min "$@" || return "$?"
-
 
 
     local upgrade=("${UPGRADE[@]}")
@@ -802,7 +832,7 @@ upgrade_packages(){
 
     if [[ "$status" -ne 0 ]]; then
 
-      \printf "\nError: There was an error during the upgrade process!\n\n"
+      \printf "\n[ERROR] There was an error during the upgrade process!\n\n"
       return 10
 
     fi
@@ -815,6 +845,9 @@ upgrade_packages(){
 
 remove_packages_standard(){
 
+
+
+    check_root || return "$?"
 
     validate_environment || return "$?"
     parse_flags_full "$@" || return "$?"
@@ -848,6 +881,10 @@ remove_packages_standard(){
 
 remove_packages(){
 
+
+    
+    
+    check_root || return "$?"
 
     validate_environment || return "$?"
     open_temp_file || return "$?"
@@ -884,11 +921,11 @@ remove_packages(){
 
         if [[ $status -eq 0 ]]; then
          
-            \printf "Package '%s' has been removed\n" "$pkg" >> "$log_success"
+            \printf "[SUCCESS] Package '%s' has been removed\n" "$pkg" >> "$log_success"
         
         else
 
-            \printf "Error: Package '%s' has not been removed\n" "$pkg" >> "$log_failure"
+            \printf "[ERROR] Package '%s' has not been removed\n" "$pkg" >> "$log_failure"
 
         fi
             
@@ -1016,7 +1053,7 @@ fkr_main(){
       
             if (($# != 1)); then
 
-              \printf "\nError: Invalid flags!\n\n"
+              \printf "\n[ERROR] Invalid flags!\n\n"
               return 8
 
             fi
@@ -1046,7 +1083,7 @@ fkr_main(){
         --display-package-manager | -dpm)
 
           if (($# != 1)); then
-            \printf "\nError: Invalid flags!\n\n"
+            \printf "\n[ERROR] Invalid flags!\n\n"
             return 8
           fi 
 
@@ -1059,7 +1096,7 @@ fkr_main(){
 
           if (($# != 1)); then
 
-            \printf "\nError: Invalid flags!\n\n"
+            \printf "\n[ERROR] Invalid flags!\n\n"
             return 8
           
           fi
@@ -1070,7 +1107,7 @@ fkr_main(){
         
         *)
            
-          \printf "\nError: Invalid argument!"
+          \printf "\n[ERROR] Invalid argument!"
             clear_space
             usage
             return 8
