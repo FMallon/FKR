@@ -12,7 +12,7 @@ This will depend on your $PATH and setup - MacOS doesn't have /var/opt for examp
 
 # Note
 
-This has been tested extensively in hundreds of minimal Podman containers - on Arm64 and Amd64 architectures (Fedora, Nginx, Arch, Debian, Ubuntu) and I have had no failures, so I feel confident in saying that it works absolutely well for its intended Use-Case!
+This has been tested extensively in over 10,000 of minimal Podman containers - on Arm64 and Amd64 architectures (Fedora, Nginx, Arch, Debian, Ubuntu) and I have had no failures, so I feel confident in saying that it works absolutely well for its intended Use-Case!
 
 It should work for APT, DNF, Pacman, Zypper, APK, Brew to do the basics - but it is dependent on Bash Version 4+.
 
@@ -43,7 +43,7 @@ With a forloop, SSH and a single command, one can easily upgrade/install/remove 
 
 #########################################
 
-I will not be doing Portage - that's its own thing - however, if any Gentoo user's wish to add their own commands, there is a template in the 'get_pkgmngr()' function.  Just copy paste, add your desired commands, and it should work. 
+I will not be doing Portage - that's its own thing - however, if any Gentoo users wish to add their own commands, there is a template in the 'get_pkgmngr()' function.  Just copy paste, add your desired commands, and it should work. 
 
 Still needs more testing, across all the distros supported - dnf, apt, apk, Pacman, zypper, brew, and xbps should also be supported soon! 
 
